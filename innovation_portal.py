@@ -1,12 +1,19 @@
 import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(page_title="Innovation Portal", layout="centered")
-
 st.title("💡 Innovation Portal")
 
-# ---- Form for submitting ideas ----
-st.header("Submit a New Idea")
+CSV_FILE = "ideas.csv"
+
+# ---- Initialize CSV file if not exists ----
+if not os.path.exists(CSV_FILE):
+    df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category"])
+    df_init.to_csv(CSV_FILE, index=False)
+
+# ---- Idea submission form ----
+st.header("📝 Submit a New Idea")
 with st.form("idea_form"):
     name = st.text_input("Your Name")
     title = st.text_input("Idea Title")
@@ -15,16 +22,29 @@ with st.form("idea_form"):
     submitted = st.form_submit_button("Submit Idea")
 
     if submitted:
-        st.success(f"✅ Idea '{title}' submitted by {name}!")
+        if name and title and description:
+            new_row = pd.DataFrame([[name, title, description, category]],
+                                   columns=["Name", "Title", "Description", "Category"])
+            new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
+            st.success(f"✅ Idea '{title}' submitted by {name}!")
+            st.experimental_rerun()  # Refresh to show updated table
+        else:
+            st.error("⚠️ Please fill out all fields.")
 
-# ---- Display example ideas ----
-st.header("Browse Submitted Ideas")
-data = {
-    "Title": ["Smart AI Assistant", "Eco-friendly Packaging"],
-    "Category": ["Technology", "Operations"],
-    "Submitted By": ["Alice", "Bob"],
-    "Status": ["Under Review", "Approved"],
-    "Votes": [10, 25]
-}
-df = pd.DataFrame(data)
-st.dataframe(df)
+# ---- Display submitted ideas ----
+st.header("📋 Browse Submitted Ideas")
+try:
+    ideas_df = pd.read_csv(CSV_FILE)
+    st.dataframe(ideas_df, use_container_width=True)
+except Exception as e:
+    st.error("Error loading ideas.")
+    st.text(str(e))
+
+# ---- Download ideas.csv ----
+with open(CSV_FILE, "rb") as file:
+    st.download_button(
+        label="📥 Download All Ideas (CSV)",
+        data=file,
+        file_name="ideas.csv",
+        mime="text/csv"
+    )
