@@ -7,7 +7,7 @@ st.title("💡 Innovation Portal")
 
 CSV_FILE = "ideas.csv"
 
-# ---- Initialize CSV file if not exists ----
+# ---- Initialize CSV file if it doesn't exist ----
 if not os.path.exists(CSV_FILE):
     df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category"])
     df_init.to_csv(CSV_FILE, index=False)
@@ -27,7 +27,7 @@ with st.form("idea_form"):
                                    columns=["Name", "Title", "Description", "Category"])
             new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success(f"✅ Idea '{title}' submitted by {name}!")
-            st.experimental_rerun()  # Refresh to show updated table
+            st.rerun()  # ✅ Correct method to refresh app
         else:
             st.error("⚠️ Please fill out all fields.")
 
