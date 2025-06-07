@@ -3,11 +3,41 @@ import pandas as pd
 import os
 
 st.set_page_config(page_title="Innovation Portal", layout="centered")
-st.title("💡 Innovation Portal")
 
 CSV_FILE = "ideas.csv"
 
-# ---- Initialize CSV file if it doesn't exist ----
+# ---- Simple User Authentication ----
+USERS = {
+    "alice": "password123",
+    "bob": "secret456"
+}
+
+def login():
+    st.title("🔐 Login to Innovation Portal")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
+            st.session_state["logged_in"] = True
+            st.session_state["user"] = username
+            st.success("✅ Login successful!")
+            st.experimental_rerun()
+        else:
+            st.error("❌ Invalid username or password")
+
+# ---- First-time login check ----
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+if not st.session_state["logged_in"]:
+    login()
+    st.stop()  # Don't show anything else until logged in
+
+# ---- Innovation Portal Main App ----
+st.title("💡 Innovation Portal")
+st.write(f"👋 Welcome, **{st.session_state['user']}**")
+
+# ---- Initialize CSV file if not exists ----
 if not os.path.exists(CSV_FILE):
     df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category"])
     df_init.to_csv(CSV_FILE, index=False)
@@ -27,7 +57,7 @@ with st.form("idea_form"):
                                    columns=["Name", "Title", "Description", "Category"])
             new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success(f"✅ Idea '{title}' submitted by {name}!")
-            st.rerun()  # ✅ Correct method to refresh app
+            st.rerun()
         else:
             st.error("⚠️ Please fill out all fields.")
 
