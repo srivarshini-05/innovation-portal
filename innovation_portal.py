@@ -21,9 +21,10 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["user"] = username
             st.success("✅ Login successful!")
-            st.experimental_rerun()
+            st.rerun()  # ✅ Use this instead of experimental_rerun
         else:
             st.error("❌ Invalid username or password")
+
 
 # ---- First-time login check ----
 if "logged_in" not in st.session_state:
