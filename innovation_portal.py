@@ -21,10 +21,9 @@ def login():
             st.session_state["logged_in"] = True
             st.session_state["user"] = username
             st.success("✅ Login successful!")
-            st.rerun()  # ✅ Use this instead of experimental_rerun
+            st.rerun()
         else:
             st.error("❌ Invalid username or password")
-
 
 # ---- First-time login check ----
 if "logged_in" not in st.session_state:
@@ -32,7 +31,7 @@ if "logged_in" not in st.session_state:
 
 if not st.session_state["logged_in"]:
     login()
-    st.stop()  # Don't show anything else until logged in
+    st.stop()
 
 # ---- Innovation Portal Main App ----
 st.title("💡 Innovation Portal")
@@ -40,7 +39,7 @@ st.write(f"👋 Welcome, **{st.session_state['user']}**")
 
 # ---- Initialize CSV file if not exists ----
 if not os.path.exists(CSV_FILE):
-    df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category"])
+    df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category", "Votes"])
     df_init.to_csv(CSV_FILE, index=False)
 
 # ---- Idea submission form ----
@@ -54,19 +53,33 @@ with st.form("idea_form"):
 
     if submitted:
         if name and title and description:
-            new_row = pd.DataFrame([[name, title, description, category]],
-                                   columns=["Name", "Title", "Description", "Category"])
+            new_row = pd.DataFrame([[name, title, description, category, 0]],
+                                   columns=["Name", "Title", "Description", "Category", "Votes"])
             new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success(f"✅ Idea '{title}' submitted by {name}!")
             st.rerun()
         else:
             st.error("⚠️ Please fill out all fields.")
 
-# ---- Display submitted ideas ----
+# ---- Display submitted ideas with voting ----
 st.header("📋 Browse Submitted Ideas")
+
 try:
     ideas_df = pd.read_csv(CSV_FILE)
-    st.dataframe(ideas_df, use_container_width=True)
+
+    for idx, row in ideas_df.iterrows():
+        with st.expander(f"💡 {row['Title']} by {row['Name']}"):
+            st.write(f"**Category:** {row['Category']}")
+            st.write(row['Description'])
+            st.write(f"👍 **Votes:** {row['Votes']}")
+
+            vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}")
+            if vote_btn:
+                ideas_df.at[idx, "Votes"] += 1
+                ideas_df.to_csv(CSV_FILE, index=False)
+                st.success("✅ Vote recorded!")
+                st.rerun()
+
 except Exception as e:
     st.error("Error loading ideas.")
     st.text(str(e))
