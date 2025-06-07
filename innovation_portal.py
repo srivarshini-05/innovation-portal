@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="Innovation Portal", layout="centered")
 
 CSV_FILE = "ideas.csv"
+VOTES_FILE = "votes.csv"
 
 # ---- Simple User Authentication ----
 USERS = {
@@ -38,11 +39,15 @@ if not st.session_state["logged_in"]:
 st.title("💡 Innovation Portal")
 st.write(f"👋 Welcome, **{st.session_state['user']}**")
 
-# ---- Initialize CSV file if not exists ----
+# ---- Initialize CSV files if not exist ----
 if not os.path.exists(CSV_FILE):
     df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category", "Votes"])
-    df_init = df_init.astype({"Votes": "int"})  # Initialize 'Votes' as integer
+    df_init = df_init.astype({"Votes": "int"})
     df_init.to_csv(CSV_FILE, index=False)
+
+if not os.path.exists(VOTES_FILE):
+    votes_init = pd.DataFrame(columns=["Username", "IdeaTitle"])
+    votes_init.to_csv(VOTES_FILE, index=False)
 
 # ---- Idea submission form ----
 st.header("📝 Submit a New Idea")
@@ -57,60 +62,69 @@ with st.form("idea_form"):
         if name and title and description:
             new_row = pd.DataFrame([[name, title, description, category, 0]],
                                    columns=["Name", "Title", "Description", "Category", "Votes"])
-            new_row["Votes"] = new_row["Votes"].astype(int)  # Force integer
+            new_row["Votes"] = new_row["Votes"].astype(int)
             new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success(f"✅ Idea '{title}' submitted by {name}!")
             st.rerun()
         else:
             st.error("⚠️ Please fill out all fields.")
 
-# ---- Load ideas and ensure Votes column is integer ----
-try:
-    ideas_df = pd.read_csv(CSV_FILE)
-    ideas_df["Votes"] = pd.to_numeric(ideas_df["Votes"], errors="coerce").fillna(0).astype(int)
+# ---- Load ideas and votes ----
+ideas_df = pd.read_csv(CSV_FILE)
+ideas_df["Votes"] = pd.to_numeric(ideas_df["Votes"], errors="coerce").fillna(0).astype(int)
+votes_df = pd.read_csv(VOTES_FILE)
 
-    # --- 🔍 Filters ---
-    st.header("📋 Browse Submitted Ideas")
-    st.subheader("🔎 Filter Ideas")
-    search_keyword = st.text_input("Search by keyword (title or description)")
-    category_filter = st.selectbox("Filter by category", ["All"] + sorted(ideas_df["Category"].unique()))
+# ---- Filters ----
+st.header("📋 Browse Submitted Ideas")
+st.subheader("🔎 Filter Ideas")
+search_keyword = st.text_input("Search by keyword (title or description)")
+category_filter = st.selectbox("Filter by category", ["All"] + sorted(ideas_df["Category"].unique()))
 
-    filtered_df = ideas_df.copy()
+filtered_df = ideas_df.copy()
+if search_keyword:
+    keyword = search_keyword.lower()
+    filtered_df = filtered_df[
+        filtered_df["Title"].str.lower().str.contains(keyword) |
+        filtered_df["Description"].str.lower().str.contains(keyword)
+    ]
+if category_filter != "All":
+    filtered_df = filtered_df[filtered_df["Category"] == category_filter]
 
-    if search_keyword:
-        keyword = search_keyword.lower()
-        filtered_df = filtered_df[
-            filtered_df["Title"].str.lower().str.contains(keyword) |
-            filtered_df["Description"].str.lower().str.contains(keyword)
-        ]
+# ---- Show ideas and vote buttons ----
+if filtered_df.empty:
+    st.info("No ideas match your search.")
+else:
+    for idx, row in filtered_df.iterrows():
+        with st.expander(f"💡 {row['Title']} by {row['Name']}"):
+            st.write(f"**Category:** {row['Category']}")
+            st.write(row['Description'])
+            st.write(f"👍 **Votes:** {row['Votes']}")
 
-    if category_filter != "All":
-        filtered_df = filtered_df[filtered_df["Category"] == category_filter]
+            # Check if user already voted for this idea
+            has_voted = not votes_df[
+                (votes_df["Username"] == st.session_state["user"]) &
+                (votes_df["IdeaTitle"] == row["Title"])
+            ].empty
 
-    # --- 📄 Show Ideas ---
-    if filtered_df.empty:
-        st.info("No ideas match your search.")
-    else:
-        for idx, row in filtered_df.iterrows():
-            with st.expander(f"💡 {row['Title']} by {row['Name']}"):
-                st.write(f"**Category:** {row['Category']}")
-                st.write(row['Description'])
-                st.write(f"👍 **Votes:** {row['Votes']}")
-
+            if has_voted:
+                st.info("✅ You have already voted for this idea.")
+            else:
                 vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}")
                 if vote_btn:
-                    ideas_df.at[idx, "Votes"] += 1
+                    # Update votes
+                    ideas_df.loc[ideas_df["Title"] == row["Title"], "Votes"] += 1
                     ideas_df.to_csv(CSV_FILE, index=False)
-                    st.success("✅ Vote recorded!")
-                    st.rerun()
 
-except Exception as e:
-    st.error("Error loading ideas.")
-    st.text(str(e))
+                    # Add vote record
+                    new_vote = pd.DataFrame([[st.session_state["user"], row["Title"]]],
+                                             columns=["Username", "IdeaTitle"])
+                    new_vote.to_csv(VOTES_FILE, mode="a", header=False, index=False)
+
+                    st.success("✅ Your vote has been recorded!")
+                    st.rerun()
 
 # ---- Analytics Dashboard ----
 st.header("📊 Analytics Dashboard")
-
 if not ideas_df.empty:
     # Top categories
     category_counts = ideas_df["Category"].value_counts()
@@ -131,7 +145,6 @@ if not ideas_df.empty:
     ax2.set_title("Top 5 Most Voted Ideas")
     ax2.invert_yaxis()
     st.pyplot(fig2)
-
 else:
     st.info("No data available for analytics.")
 
