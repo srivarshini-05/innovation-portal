@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Innovation Portal", layout="centered")
 
@@ -101,6 +102,36 @@ try:
 
 except Exception as e:
     st.error("Error loading ideas.")
+    st.text(str(e))
+
+# ---- 📊 Analytics Dashboard ----
+st.header("📊 Analytics Dashboard")
+
+try:
+    ideas_df = pd.read_csv(CSV_FILE)
+
+    # --- Top Categories ---
+    st.subheader("📈 Top Categories")
+    category_counts = ideas_df["Category"].value_counts()
+    fig1, ax1 = plt.subplots()
+    category_counts.plot(kind="bar", ax=ax1, color="skyblue")
+    ax1.set_xlabel("Category")
+    ax1.set_ylabel("Number of Ideas")
+    ax1.set_title("Ideas per Category")
+    st.pyplot(fig1)
+
+    # --- Most Voted Ideas ---
+    st.subheader("🏆 Most Voted Ideas")
+    top_voted = ideas_df.sort_values(by="Votes", ascending=False).head(5)
+    fig2, ax2 = plt.subplots()
+    ax2.barh(top_voted["Title"], top_voted["Votes"], color="green")
+    ax2.set_xlabel("Votes")
+    ax2.set_title("Top 5 Most Voted Ideas")
+    ax2.invert_yaxis()  # Highest voted at top
+    st.pyplot(fig2)
+
+except Exception as e:
+    st.error("Error loading analytics data.")
     st.text(str(e))
 
 # ---- Download ideas.csv ----
