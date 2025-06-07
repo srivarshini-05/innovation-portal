@@ -61,8 +61,50 @@ with st.form("idea_form"):
         else:
             st.error("⚠️ Please fill out all fields.")
 
-# ---- Display submitted ideas with voting ----
+# ---- Display submitted ideas with filtering & voting ----
 st.header("📋 Browse Submitted Ideas")
+
+try:
+    ideas_df = pd.read_csv(CSV_FILE)
+
+    # --- 🔍 Filters ---
+    st.subheader("🔎 Filter Ideas")
+    search_keyword = st.text_input("Search by keyword (title or description)")
+    category_filter = st.selectbox("Filter by category", ["All"] + sorted(ideas_df["Category"].unique()))
+
+    filtered_df = ideas_df.copy()
+
+    if search_keyword:
+        keyword = search_keyword.lower()
+        filtered_df = filtered_df[
+            filtered_df["Title"].str.lower().str.contains(keyword) |
+            filtered_df["Description"].str.lower().str.contains(keyword)
+        ]
+
+    if category_filter != "All":
+        filtered_df = filtered_df[filtered_df["Category"] == category_filter]
+
+    # --- 📄 Show Ideas ---
+    if filtered_df.empty:
+        st.info("No ideas match your search.")
+    else:
+        for idx, row in filtered_df.iterrows():
+            with st.expander(f"💡 {row['Title']} by {row['Name']}"):
+                st.write(f"**Category:** {row['Category']}")
+                st.write(row['Description'])
+                st.write(f"👍 **Votes:** {row['Votes']}")
+
+                vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}")
+                if vote_btn:
+                    ideas_df.at[idx, "Votes"] += 1
+                    ideas_df.to_csv(CSV_FILE, index=False)
+                    st.success("✅ Vote recorded!")
+                    st.rerun()
+
+except Exception as e:
+    st.error("Error loading ideas.")
+    st.text(str(e))
+
 
 try:
     ideas_df = pd.read_csv(CSV_FILE)
