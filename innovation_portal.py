@@ -35,10 +35,6 @@ if not st.session_state["logged_in"]:
     login()
     st.stop()
 
-# ---- Innovation Portal Main App ----
-st.title("💡 Innovation Portal")
-st.write(f"👋 Welcome, **{st.session_state['user']}**")
-
 # ---- Initialize CSV files if not exist ----
 if not os.path.exists(CSV_FILE):
     df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category", "Votes"])
@@ -50,6 +46,9 @@ if not os.path.exists(VOTES_FILE):
     votes_init.to_csv(VOTES_FILE, index=False)
 
 # ---- Idea submission form ----
+st.title("💡 Innovation Portal")
+st.write(f"👋 Welcome, **{st.session_state['user']}**")
+
 st.header("📝 Submit a New Idea")
 with st.form("idea_form"):
     name = st.text_input("Your Name")
@@ -72,7 +71,6 @@ with st.form("idea_form"):
 # ---- Load ideas and votes ----
 ideas_df = pd.read_csv(CSV_FILE)
 ideas_df["Votes"] = pd.to_numeric(ideas_df["Votes"], errors="coerce").fillna(0).astype(int)
-votes_df = pd.read_csv(VOTES_FILE)
 
 # ---- Filters ----
 st.header("📋 Browse Submitted Ideas")
@@ -100,6 +98,9 @@ else:
             st.write(row['Description'])
             st.write(f"👍 **Votes:** {row['Votes']}")
 
+            # --- Load latest votes_df each time to ensure up-to-date state
+            votes_df = pd.read_csv(VOTES_FILE)
+
             # Check if user already voted for this idea
             has_voted = not votes_df[
                 (votes_df["Username"] == st.session_state["user"]) &
@@ -111,11 +112,11 @@ else:
             else:
                 vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}")
                 if vote_btn:
-                    # Update votes
+                    # Update votes in ideas.csv
                     ideas_df.loc[ideas_df["Title"] == row["Title"], "Votes"] += 1
                     ideas_df.to_csv(CSV_FILE, index=False)
 
-                    # Add vote record
+                    # Add to votes.csv
                     new_vote = pd.DataFrame([[st.session_state["user"], row["Title"]]],
                                              columns=["Username", "IdeaTitle"])
                     new_vote.to_csv(VOTES_FILE, mode="a", header=False, index=False)
