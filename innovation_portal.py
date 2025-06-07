@@ -7,7 +7,7 @@ st.set_page_config(page_title="Innovation Portal", layout="centered")
 
 CSV_FILE = "ideas.csv"
 
-# ---- User Authentication ----
+# ---- Simple User Authentication ----
 USERS = {
     "alice": "password123",
     "bob": "secret456"
@@ -26,6 +26,7 @@ def login():
         else:
             st.error("❌ Invalid username or password")
 
+# ---- First-time login check ----
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
 
@@ -33,14 +34,15 @@ if not st.session_state["logged_in"]:
     login()
     st.stop()
 
+# ---- Innovation Portal Main App ----
+st.title("💡 Innovation Portal")
+st.write(f"👋 Welcome, **{st.session_state['user']}**")
+
 # ---- Initialize CSV file if not exists ----
 if not os.path.exists(CSV_FILE):
     df_init = pd.DataFrame(columns=["Name", "Title", "Description", "Category", "Votes"])
+    df_init = df_init.astype({"Votes": "int"})  # Initialize 'Votes' as integer
     df_init.to_csv(CSV_FILE, index=False)
-
-# ---- Main App ----
-st.title("💡 Innovation Portal")
-st.write(f"👋 Welcome, **{st.session_state['user']}**")
 
 # ---- Idea submission form ----
 st.header("📝 Submit a New Idea")
@@ -55,18 +57,20 @@ with st.form("idea_form"):
         if name and title and description:
             new_row = pd.DataFrame([[name, title, description, category, 0]],
                                    columns=["Name", "Title", "Description", "Category", "Votes"])
+            new_row["Votes"] = new_row["Votes"].astype(int)  # Force integer
             new_row.to_csv(CSV_FILE, mode='a', header=False, index=False)
             st.success(f"✅ Idea '{title}' submitted by {name}!")
             st.rerun()
         else:
             st.error("⚠️ Please fill out all fields.")
 
-# ---- Display submitted ideas with filtering & voting ----
-st.header("📋 Browse Submitted Ideas")
+# ---- Load ideas and ensure Votes column is integer ----
 try:
     ideas_df = pd.read_csv(CSV_FILE)
+    ideas_df["Votes"] = pd.to_numeric(ideas_df["Votes"], errors="coerce").fillna(0).astype(int)
 
     # --- 🔍 Filters ---
+    st.header("📋 Browse Submitted Ideas")
     st.subheader("🔎 Filter Ideas")
     search_keyword = st.text_input("Search by keyword (title or description)")
     category_filter = st.selectbox("Filter by category", ["All"] + sorted(ideas_df["Category"].unique()))
@@ -93,7 +97,7 @@ try:
                 st.write(row['Description'])
                 st.write(f"👍 **Votes:** {row['Votes']}")
 
-                vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}_{row['Title']}")
+                vote_btn = st.button(f"Vote for '{row['Title']}'", key=f"vote_{idx}")
                 if vote_btn:
                     ideas_df.at[idx, "Votes"] += 1
                     ideas_df.to_csv(CSV_FILE, index=False)
@@ -104,35 +108,32 @@ except Exception as e:
     st.error("Error loading ideas.")
     st.text(str(e))
 
-# ---- 📊 Analytics Dashboard ----
+# ---- Analytics Dashboard ----
 st.header("📊 Analytics Dashboard")
 
-try:
-    ideas_df = pd.read_csv(CSV_FILE)
-
-    # --- Top Categories ---
-    st.subheader("📈 Top Categories")
+if not ideas_df.empty:
+    # Top categories
     category_counts = ideas_df["Category"].value_counts()
+    st.subheader("Top Categories by Number of Ideas")
     fig1, ax1 = plt.subplots()
     category_counts.plot(kind="bar", ax=ax1, color="skyblue")
     ax1.set_xlabel("Category")
     ax1.set_ylabel("Number of Ideas")
-    ax1.set_title("Ideas per Category")
+    ax1.set_title("Number of Ideas per Category")
     st.pyplot(fig1)
 
-    # --- Most Voted Ideas ---
-    st.subheader("🏆 Most Voted Ideas")
+    # Most voted ideas
     top_voted = ideas_df.sort_values(by="Votes", ascending=False).head(5)
+    st.subheader("Top 5 Most Voted Ideas")
     fig2, ax2 = plt.subplots()
     ax2.barh(top_voted["Title"], top_voted["Votes"], color="green")
     ax2.set_xlabel("Votes")
     ax2.set_title("Top 5 Most Voted Ideas")
-    ax2.invert_yaxis()  # Highest voted at top
+    ax2.invert_yaxis()
     st.pyplot(fig2)
 
-except Exception as e:
-    st.error("Error loading analytics data.")
-    st.text(str(e))
+else:
+    st.info("No data available for analytics.")
 
 # ---- Download ideas.csv ----
 with open(CSV_FILE, "rb") as file:
